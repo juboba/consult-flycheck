@@ -33,6 +33,11 @@
 (require 'consult)
 (require 'flycheck)
 
+(defcustom consult-flycheck-focus-at-point nil
+  "When non-nil, pre-select the error at or nearest after point."
+  :type 'boolean
+  :group 'consult-flycheck)
+
 (defconst consult-flycheck--narrow
   '((?e . "Error")
     (?w . "Warning")
@@ -123,21 +128,49 @@ In contrast to `flycheck-error-level-<' sort errors first."
             (_ ?i)))))
      errors)))
 
+(defun consult-flycheck--reorder-at-point (candidates)
+  "Reorder CANDIDATES so the error at or nearest after point comes first.
+Candidates before point are appended after, preserving relative order."
+  (let ((pos (point))
+        (buf (current-buffer))
+        (best-idx 0)
+        (best-dist most-positive-fixnum)
+        (idx 0))
+    (dolist (cand candidates)
+      (when-let* ((data (get-text-property 0 'consult--candidate cand))
+                  (marker (car data)))
+        (when (and (eq (marker-buffer marker) buf)
+                   (marker-position marker))
+          (let ((dist (- (marker-position marker) pos)))
+            (when (or (and (>= dist 0) (< dist best-dist))
+                      (and (< best-dist 0) (> dist best-dist)))
+              (setq best-idx idx
+                    best-dist dist)))))
+      (cl-incf idx))
+    (if (= best-idx 0)
+        candidates
+      (append (nthcdr best-idx candidates)
+              (seq-take candidates best-idx)))))
+
 ;;;###autoload
 (defun consult-flycheck ()
   "Jump to flycheck error."
   (interactive)
-  (consult--read
-   (consult--with-increased-gc (consult-flycheck--candidates))
-   :prompt "Flycheck error: "
-   :category 'consult-flycheck-error
-   :history t ;; disable history
-   :require-match t
-   :sort nil
-   :group (consult--type-group consult-flycheck--narrow)
-   :narrow (consult--type-narrow consult-flycheck--narrow)
-   :lookup #'consult--lookup-candidate
-   :state (consult--jump-state)))
+  (let ((candidates (consult--with-increased-gc (consult-flycheck--candidates))))
+    (when consult-flycheck-focus-at-point
+      (setq candidates (consult-flycheck--reorder-at-point candidates)))
+    (consult--read
+     candidates
+     :prompt "Flycheck error: "
+     :category 'consult-flycheck-error
+     :default (when consult-flycheck-focus-at-point (car candidates))
+     :history t ;; disable history
+     :require-match t
+     :sort nil
+     :group (consult--type-group consult-flycheck--narrow)
+     :narrow (consult--type-narrow consult-flycheck--narrow)
+     :lookup #'consult--lookup-candidate
+     :state (consult--jump-state))))
 
 (provide 'consult-flycheck)
 ;;; consult-flycheck.el ends here

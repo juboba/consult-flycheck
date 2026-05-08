@@ -8,3 +8,14 @@
 
 This package provides the =consult-flycheck= command, which integrates [[https://github.com/minad/consult][Consult]]
 with [[https://github.com/flycheck/flycheck][Flycheck]]. Take a look at the [[https://github.com/minad/consult/blob/main/README.org][Consult README]] for an extensive documentation.
+
+* Configuration
+
+** =consult-flycheck-focus-at-point=
+
+When non-nil, pre-select the error at or nearest after point. Errors before point are
+listed after those at or ahead of point, preserving their relative order.
+
+#+begin_src emacs-lisp
+(setq consult-flycheck-focus-at-point t)
+#+end_src
